@@ -1,15 +1,38 @@
 from pico2d import *
 from ball import Ball
 
+import game_world
+
+def fire_ball(self):
+    ball = Ball(self.x, self.y, self.dir*3)
+    game_world.add_object(ball, 1)
+
+
+history = []
+
+
 # Boy Event
-RIGHT_DOWN, LEFT_DOWN, RIGHT_UP, LEFT_UP, SLEEP_TIMER = range(5)
+RIGHT_DOWN, LEFT_DOWN, RIGHT_UP, LEFT_UP, SLEEP_TIMER,\
+SHIFT_UP, SHIFT_DOWN, DASH_TIMER, DEBUG_KEY, SPACE = range(10)
+
+event_name = ['RIGHT_DOWN', 'LEFT_DOWN', 'RIGHT_UP', 'LEFT_UP', 'SLEEP_TIMER',\
+'SHIFT_UP', 'SHIFT_DOWN', 'DASH_TIMER' , 'DEBUG_KEY']
 
 key_event_table = {
+    (SDL_KEYDOWN, SDLK_d): DEBUG_KEY,
+
     (SDL_KEYDOWN, SDLK_RIGHT): RIGHT_DOWN,
     (SDL_KEYDOWN, SDLK_LEFT): LEFT_DOWN,
     (SDL_KEYUP, SDLK_RIGHT): RIGHT_UP,
-    (SDL_KEYUP, SDLK_LEFT): LEFT_UP
+    (SDL_KEYUP, SDLK_LEFT): LEFT_UP,
+    (SDL_KEYDOWN, SDLK_SPACE): SPACE,
+
+    (SDL_KEYDOWN, SDLK_LSHIFT): SHIFT_DOWN,
+    (SDL_KEYDOWN, SDLK_RSHIFT): LEFT_DOWN,
+    (SDL_KEYUP, SDLK_LSHIFT): RIGHT_UP,
+    (SDL_KEYUP, SDLK_RSHIFT): LEFT_UP
 }
+
 
 
 # Boy States
@@ -89,12 +112,42 @@ class SleepState:
         else:
             boy.image.clip_composite_draw(boy.frame * 100, 200, 100, 100, -3.141592 / 2, '', boy.x + 25, boy.y - 25, 100, 100)
 
+class DashState:
+
+        def enter(boy, event):
+            print('ENTER Dash')
+            boy.dir = boy.velocity
+
+        def exit(boy, event):
+            print('EXIT DASH')
+
+        def do(boy):
+            boy.frame = (boy.frame + 1) % 8
+            boy.x += boy.velocity * 2
+            boy.x = clamp(25, boy.x, 1600 - 25)
+
+        def draw(boy):
+            if boy.velocity == 1:
+                boy.image.clip_draw(boy.frame * 100, 100, 100, 100, boy.x, boy.y)
+            else:
+                boy.image.clip_draw(boy.frame * 100, 0, 100, 100, boy.x, boy.y)
+
+        def update(self):
+            self.cur_state.do(self)
+            if len(self.event_que) > 0:
+                event = self.event_que
 
 next_state_table = {
-    IdleState: {RIGHT_UP: RunState, LEFT_UP: RunState, RIGHT_DOWN: RunState, LEFT_DOWN: RunState, SLEEP_TIMER: SleepState},
-    RunState: {RIGHT_UP: IdleState, LEFT_UP: IdleState, LEFT_DOWN: IdleState, RIGHT_DOWN: IdleState},
-    SleepState: {LEFT_DOWN: RunState, RIGHT_DOWN: RunState, LEFT_UP: RunState, RIGHT_UP: RunState}
+    DashState: {SHIFT_UP: RunState, SHIFT_DOWN: RunState, DASH_TIMER: RunState,
+                LEFT_DOWN: IdleState, RIGHT_DOWN: IdleState, RIGHT_UP: IdleState,},
+    IdleState: {RIGHT_UP: RunState, LEFT_UP: RunState, RIGHT_DOWN: RunState, LEFT_DOWN: RunState,
+                SLEEP_TIMER: SleepState, SHIFT_DOWN: IdleState, SHIFT_UP: IdleState, SPACE: IdleState},
+    RunState: {RIGHT_UP: IdleState, LEFT_UP: IdleState, LEFT_DOWN: IdleState, RIGHT_DOWN: IdleState,
+               SHIFT_DOWN: DashState, SPACE: RunState},
+    SleepState: {LEFT_DOWN: RunState, RIGHT_DOWN: RunState, LEFT_UP: RunState, RIGHT_UP: RunState,
+                 SPACE: IdleState}
 }
+
 
 
 class Boy:
@@ -117,7 +170,14 @@ class Boy:
         if len(self.event_que) > 0:
             event = self.event_que.pop()
             self.cur_state.exit(self, event)
-            self.cur_state = next_state_table[self.cur_state][event]
+
+            try:
+                self.cur_state = next_state_table[self.cur_state][event]
+                history.append((self.cur_state.__name__, event_name[event]))
+            except:
+                print('State :', self.cur_state.__name__,' Event :', event_name[event])
+                exit(-1)
+
             self.cur_state.enter(self, event)
 
     def draw(self):
@@ -127,5 +187,8 @@ class Boy:
     def handle_event(self, event):
         if (event.type, event.key) in key_event_table:
             key_event = key_event_table[(event.type, event.key)]
-            self.add_event(key_event)
+            if DEBUG_KEY == key_event:
+                print(history[-10:])
+            else:
+                self.add_event(key_event)
 
