@@ -3,10 +3,6 @@ from ball import Ball
 
 import game_world
 
-def fire_ball(self):
-    ball = Ball(self.x, self.y, self.dir*3)
-    game_world.add_object(ball, 1)
-
 
 history = []
 
@@ -16,7 +12,7 @@ RIGHT_DOWN, LEFT_DOWN, RIGHT_UP, LEFT_UP, SLEEP_TIMER,\
 SHIFT_UP, SHIFT_DOWN, DASH_TIMER, DEBUG_KEY, SPACE = range(10)
 
 event_name = ['RIGHT_DOWN', 'LEFT_DOWN', 'RIGHT_UP', 'LEFT_UP', 'SLEEP_TIMER',\
-'SHIFT_UP', 'SHIFT_DOWN', 'DASH_TIMER' , 'DEBUG_KEY']
+'SHIFT_UP', 'SHIFT_DOWN', 'DASH_TIMER' , 'DEBUG_KEY', 'SPACE']
 
 key_event_table = {
     (SDL_KEYDOWN, SDLK_d): DEBUG_KEY,
@@ -28,9 +24,9 @@ key_event_table = {
     (SDL_KEYDOWN, SDLK_SPACE): SPACE,
 
     (SDL_KEYDOWN, SDLK_LSHIFT): SHIFT_DOWN,
-    (SDL_KEYDOWN, SDLK_RSHIFT): LEFT_DOWN,
-    (SDL_KEYUP, SDLK_LSHIFT): RIGHT_UP,
-    (SDL_KEYUP, SDLK_RSHIFT): LEFT_UP
+    (SDL_KEYDOWN, SDLK_RSHIFT): SHIFT_DOWN,
+    (SDL_KEYUP, SDLK_LSHIFT): SHIFT_UP,
+    (SDL_KEYUP, SDLK_RSHIFT): SHIFT_UP
 }
 
 
@@ -51,7 +47,8 @@ class IdleState:
         boy.timer = 1000
 
     def exit(boy, event):
-        pass
+        if event == SPACE:
+            fire_ball(boy)
 
     def do(boy):
         boy.frame = (boy.frame + 1) % 8
@@ -80,7 +77,8 @@ class RunState:
         boy.dir = boy.velocity
 
     def exit(boy, event):
-        pass
+        if event == SPACE:
+            fire_ball(boy)
 
     def do(boy):
         boy.frame = (boy.frame + 1) % 8
@@ -119,6 +117,8 @@ class DashState:
             boy.dir = boy.velocity
 
         def exit(boy, event):
+            if event == SPACE:
+                fire_ball(boy)
             print('EXIT DASH')
 
         def do(boy):
@@ -132,18 +132,18 @@ class DashState:
             else:
                 boy.image.clip_draw(boy.frame * 100, 0, 100, 100, boy.x, boy.y)
 
-        def update(self):
-            self.cur_state.do(self)
-            if len(self.event_que) > 0:
-                event = self.event_que
+def fire_ball(self):
+    ball = Ball(self.x, self.y, self.dir*3)
+    game_world.add_object(ball, 1)
+
 
 next_state_table = {
-    DashState: {SHIFT_UP: RunState, SHIFT_DOWN: RunState, DASH_TIMER: RunState,
-                LEFT_DOWN: IdleState, RIGHT_DOWN: IdleState, RIGHT_UP: IdleState,},
+    DashState: {SHIFT_UP: RunState, SHIFT_DOWN: RunState, DASH_TIMER: RunState, LEFT_UP: IdleState,
+                LEFT_DOWN: IdleState, RIGHT_DOWN: IdleState, RIGHT_UP: IdleState, SPACE: DashState },
     IdleState: {RIGHT_UP: RunState, LEFT_UP: RunState, RIGHT_DOWN: RunState, LEFT_DOWN: RunState,
                 SLEEP_TIMER: SleepState, SHIFT_DOWN: IdleState, SHIFT_UP: IdleState, SPACE: IdleState},
     RunState: {RIGHT_UP: IdleState, LEFT_UP: IdleState, LEFT_DOWN: IdleState, RIGHT_DOWN: IdleState,
-               SHIFT_DOWN: DashState, SPACE: RunState},
+               SHIFT_DOWN: DashState, SHIFT_UP: RunState, SPACE: RunState},
     SleepState: {LEFT_DOWN: RunState, RIGHT_DOWN: RunState, LEFT_UP: RunState, RIGHT_UP: RunState,
                  SPACE: IdleState}
 }
